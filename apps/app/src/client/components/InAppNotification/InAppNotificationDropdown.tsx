@@ -8,6 +8,8 @@ import {
   DropdownToggle,
 } from 'reactstrap';
 
+import { NewsSection } from '~/features/news/client/components/NewsSection';
+import { useSWRxNewsUnreadCount } from '~/features/news/client/stores/news';
 import { useGlobalSocket } from '~/states/socket-io';
 import {
   useSWRxInAppNotificationStatus,
@@ -31,6 +33,7 @@ export const InAppNotificationDropdown = (): JSX.Element => {
     data: inAppNotificationUnreadStatusCount,
     mutate: mutateInAppNotificationUnreadStatusCount,
   } = useSWRxInAppNotificationStatus();
+  const { data: newsUnreadCount } = useSWRxNewsUnreadCount();
 
   // ripple
   const buttonRef = useRef(null);
@@ -65,11 +68,13 @@ export const InAppNotificationDropdown = (): JSX.Element => {
     setIsOpen(newIsOpenState);
   };
 
+  const totalUnreadCount =
+    (inAppNotificationUnreadStatusCount ?? 0) + (newsUnreadCount ?? 0);
+
   const badge =
-    inAppNotificationUnreadStatusCount != null &&
-    inAppNotificationUnreadStatusCount > 0 ? (
+    totalUnreadCount > 0 ? (
       <span className="badge rounded-pill bg-danger grw-notification-badge">
-        {inAppNotificationUnreadStatusCount}
+        {totalUnreadCount}
       </span>
     ) : null;
 
@@ -98,6 +103,8 @@ export const InAppNotificationDropdown = (): JSX.Element => {
               inAppNotificationData={inAppNotificationData}
             />
           )}
+          <DropdownItem divider />
+          <NewsSection limit={3} />
           <DropdownItem divider />
           <DropdownItem tag="a" href="/me/all-in-app-notifications">
             {t('in_app_notification.see_all')}

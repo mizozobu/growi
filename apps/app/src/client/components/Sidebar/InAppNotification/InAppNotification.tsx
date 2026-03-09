@@ -1,6 +1,8 @@
-import React, { type JSX, Suspense, useState } from 'react';
+import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
+
+import { NewsSection } from '~/features/news/client/components/NewsSection';
 
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
 import { InAppNotificationForms } from './InAppNotificationSubstance';
@@ -31,6 +33,8 @@ export const InAppNotification = (): JSX.Element => {
           setUnopendNotificationsVisible(!isUnopendNotificationsVisible);
         }}
       />
+
+      <NewsSection limit={3} />
 
       <Suspense fallback={<ItemsTreeContentSkeleton />}>
         <InAppNotificationContent

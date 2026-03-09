@@ -324,6 +324,12 @@ export const CONFIG_KEYS = [
   'app:isBulkExportPagesEnabled',
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled',
 
+  // News Settings
+  'app:newsFeedUrl',
+  'app:newsCronSchedule',
+  'app:newsCronMaxHoursUntilRequest',
+  'app:newsTargetRole',
+
   // Access Token Settings
   'accessToken:deletionCronExpression',
 ] as const;
@@ -1346,6 +1352,24 @@ export const CONFIG_DEFINITIONS = {
   'env:useOnlyEnvVars:app:isBulkExportPagesEnabled': defineConfig<boolean>({
     envVarName: 'BULK_EXPORT_PAGES_ENABLED_USES_ONLY_ENV_VARS',
     defaultValue: false,
+  }),
+
+  // News Settings
+  'app:newsFeedUrl': defineConfig<string>({
+    envVarName: 'NEWS_FEED_URL',
+    defaultValue: 'https://weseek.github.io/growi-news/feed.json',
+  }),
+  'app:newsCronSchedule': defineConfig<string>({
+    envVarName: 'NEWS_CRON_SCHEDULE',
+    defaultValue: '0 22 * * *',
+  }),
+  'app:newsCronMaxHoursUntilRequest': defineConfig<number>({
+    envVarName: 'NEWS_CRON_MAX_HOURS_UNTIL_REQUEST',
+    defaultValue: 4,
+  }),
+  'app:newsTargetRole': defineConfig<string>({
+    envVarName: 'NEWS_TARGET_ROLE',
+    defaultValue: 'all',
   }),
 
   // Access Token Settings

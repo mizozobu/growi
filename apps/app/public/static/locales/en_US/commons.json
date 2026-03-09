@@ -60,6 +60,10 @@
     "no_unread_messages": "no_unread_messages",
     "only_unread": "Only unread"
   },
+  "news": {
+    "title": "News",
+    "no_news": "No news available."
+  },
   "personal_dropdown": {
     "home": "Home",
     "settings": "Settings",

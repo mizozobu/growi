@@ -1,10 +1,11 @@
 import type { FC } from 'react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
+import { NewsTabContent } from '~/features/news/client/components/NewsTabContent';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import { showPageLimitationXLAtom } from '~/states/server-configurations';
 import {
@@ -135,6 +136,11 @@ export const InAppNotificationPage: FC = () => {
       Icon: EmptyIcon,
       Content: InAppNotificationUnreadTabContent,
       i18n: t('in_app_notification.unopend'),
+    },
+    news: {
+      Icon: EmptyIcon,
+      Content: NewsTabContent,
+      i18n: t('news.title'),
     },
   };
 

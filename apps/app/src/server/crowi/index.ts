@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
+import instanciateNewsCronService from '~/features/news/server/service/news-cron';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
 import { initializeOpenaiService } from '~/features/openai/server/services/openai';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
@@ -450,6 +451,15 @@ class Crowi {
 
     startOpenaiCronIfEnabled();
     startAccessTokenCron();
+
+    // News feed cron
+    instanciateNewsCronService(this);
+    const { newsCronService } = await import(
+      '~/features/news/server/service/news-cron'
+    );
+    if (newsCronService != null) {
+      newsCronService.startCron();
+    }
   }
 
   getSlack(): unknown {
