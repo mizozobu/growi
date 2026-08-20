@@ -1,46 +1,26 @@
 import { createHash } from 'node:crypto';
-import type { IAttachment } from '@growi/core';
 import { addSeconds } from 'date-fns/addSeconds';
-import { type Document, type Model, Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import path from 'pathe';
 
-import loggerFactory from '~/utils/logger';
+import type { attachments } from '~/generated/prisma/client';
+import { Prisma } from '~/generated/prisma/client';
+import type { prisma } from '~/utils/prisma';
 
 import { AttachmentType } from '../interfaces/attachment';
 import { getOrCreateModel } from '../util/mongoose-utils';
 
-const _logger = loggerFactory('growi:models:attachment');
-
-function generateFileHash(fileName) {
+function generateFileHash(fileName: string): string {
   const hash = createHash('md5');
   hash.update(`${fileName}_${Date.now()}`);
 
   return hash.digest('hex');
 }
 
-type GetValidTemporaryUrl = () => string | null | undefined;
-type CashTemporaryUrlByProvideSec = (
-  temporaryUrl: string,
-  lifetimeSec: number,
-) => Promise<IAttachmentDocument>;
-
-export interface IAttachmentDocument extends IAttachment, Document {
-  getValidTemporaryUrl: GetValidTemporaryUrl;
-  cashTemporaryUrlByProvideSec: CashTemporaryUrlByProvideSec;
-}
-export interface IAttachmentModel extends Model<IAttachmentDocument> {
-  createWithoutSave: (
-    pageId,
-    user,
-    originalName: string,
-    fileFormat: string,
-    fileSize: number,
-    attachmentType: AttachmentType,
-  ) => IAttachmentDocument;
-}
-
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
 const attachmentSchema = new Schema(
   {
     page: { type: Schema.Types.ObjectId, ref: 'Page', index: true },
@@ -65,29 +45,35 @@ const attachmentSchema = new Schema(
 attachmentSchema.plugin(uniqueValidator);
 attachmentSchema.plugin(mongoosePaginate);
 
-// virtual
-attachmentSchema.virtual('filePathProxied').get(function () {
-  return `/attachment/${this._id}`;
-});
+getOrCreateModel('Attachment', attachmentSchema);
 
-attachmentSchema.virtual('downloadPathProxied').get(function () {
-  return `/download/${this._id}`;
-});
+/**
+ * Data for an Attachment that has not been persisted yet: built up-front so
+ * its `fileName`/`pageId` are available to `FileUploader#uploadAttachment`
+ * before the row is created, then passed to `prisma.attachments.create()`
+ * once the upload succeeds. Keeping upload-before-create means a failed
+ * upload never leaves an orphaned Attachment row.
+ */
+export type AttachmentDraft = Pick<
+  attachments,
+  | 'pageId'
+  | 'creatorId'
+  | 'filePath'
+  | 'fileName'
+  | 'fileFormat'
+  | 'fileSize'
+  | 'originalName'
+  | 'attachmentType'
+>;
 
-attachmentSchema.set('toObject', { virtuals: true });
-attachmentSchema.set('toJSON', { virtuals: true });
-
-attachmentSchema.statics.createWithoutSave = function (
-  pageId,
-  user,
+export function buildAttachmentDraft(
+  pageId: string | null,
+  user: { _id: string },
   originalName: string,
   fileFormat: string,
   fileSize: number,
   attachmentType: AttachmentType,
-) {
-  // biome-ignore lint/complexity/noUselessThisAlias: ignore
-  const Attachment = this;
-
+): AttachmentDraft {
   const extname = path.extname(originalName);
   let fileName = generateFileHash(originalName);
   if (extname.length > 1) {
@@ -95,48 +81,96 @@ attachmentSchema.statics.createWithoutSave = function (
     fileName = `${fileName}${extname}`;
   }
 
-  const attachment = new Attachment();
-  attachment.page = pageId;
-  attachment.creator = user._id;
-  attachment.originalName = originalName;
-  attachment.fileName = fileName;
-  attachment.fileFormat = fileFormat;
-  attachment.fileSize = fileSize;
-  attachment.attachmentType = attachmentType;
-  return attachment;
-};
+  return {
+    pageId,
+    creatorId: user._id.toString(),
+    filePath: null,
+    fileName,
+    fileFormat,
+    fileSize,
+    originalName,
+    attachmentType,
+  };
+}
 
-const getValidTemporaryUrl: GetValidTemporaryUrl = function (
-  this: IAttachmentDocument,
-) {
-  if (this.temporaryUrlExpiredAt == null) {
-    return null;
-  }
-  // return null when expired url
-  if (this.temporaryUrlExpiredAt.getTime() < new Date().getTime()) {
-    return null;
-  }
-  return this.temporaryUrlCached;
-};
-attachmentSchema.methods.getValidTemporaryUrl = getValidTemporaryUrl;
+/**
+ * An attachment row as returned by the extended prisma client: the base
+ * schema fields plus the computed `_id`/`__v`/`filePathProxied`/
+ * `downloadPathProxied`/`getValidTemporaryUrl` added by `result.attachments`
+ * below. The plain generated `attachments` type does not carry these --
+ * only a query made through `prisma` (with this extension applied) does.
+ */
+export type AttachmentWithComputed = NonNullable<
+  Awaited<ReturnType<typeof prisma.attachments.findUnique>>
+>;
 
-const cashTemporaryUrlByProvideSec: CashTemporaryUrlByProvideSec = function (
-  this: IAttachmentDocument,
-  temporaryUrl,
-  lifetimeSec,
-) {
-  if (temporaryUrl == null) {
-    throw new Error('url is required.');
-  }
-  this.temporaryUrlCached = temporaryUrl;
-  this.temporaryUrlExpiredAt = addSeconds(new Date(), lifetimeSec);
-
-  return this.save();
-};
-attachmentSchema.methods.cashTemporaryUrlByProvideSec =
-  cashTemporaryUrlByProvideSec;
-
-export const Attachment = getOrCreateModel<
-  IAttachmentDocument,
-  IAttachmentModel
->('Attachment', attachmentSchema);
+export const extension = Prisma.defineExtension((client) => {
+  return client.$extends({
+    result: {
+      attachments: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+        // virtual
+        filePathProxied: {
+          needs: { id: true },
+          compute(model) {
+            return `/attachment/${model.id}`;
+          },
+        },
+        // virtual
+        downloadPathProxied: {
+          needs: { id: true },
+          compute(model) {
+            return `/download/${model.id}`;
+          },
+        },
+        getValidTemporaryUrl: {
+          needs: { temporaryUrlCached: true, temporaryUrlExpiredAt: true },
+          compute(model) {
+            return (): string | null | undefined => {
+              if (model.temporaryUrlExpiredAt == null) {
+                return null;
+              }
+              // return null when expired url
+              if (model.temporaryUrlExpiredAt.getTime() < Date.now()) {
+                return null;
+              }
+              return model.temporaryUrlCached;
+            };
+          },
+        },
+      },
+    },
+    model: {
+      attachments: {
+        cashTemporaryUrlByProvideSec(
+          attachmentId: string,
+          temporaryUrl: string,
+          lifetimeSec: number,
+        ): Promise<attachments> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.attachments>(this);
+          return context.update({
+            where: { id: attachmentId },
+            data: {
+              temporaryUrlCached: temporaryUrl,
+              temporaryUrlExpiredAt: addSeconds(new Date(), lifetimeSec),
+            },
+          });
+        },
+      },
+    },
+  });
+});

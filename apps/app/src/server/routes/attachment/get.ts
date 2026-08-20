@@ -1,4 +1,4 @@
-import { getIdStringForRef, type IPage, type IUser } from '@growi/core';
+import type { IPage, IUser } from '@growi/core';
 import type { NextFunction, Request, Response, Router } from 'express';
 import express from 'express';
 import mongoose from 'mongoose';
@@ -17,10 +17,11 @@ import {
   toExpressHttpHeaders,
 } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
-import { Attachment, type IAttachmentDocument } from '../../models/attachment';
+import type { AttachmentWithComputed } from '../../models/attachment';
 import ApiResponse from '../../util/apiResponse';
 
 const logger = loggerFactory('growi:routes:attachment:get');
@@ -33,7 +34,7 @@ interface PageModel {
   ) => Promise<boolean>;
 }
 
-type LocalsAfterDataInjection = { attachment: IAttachmentDocument };
+type LocalsAfterDataInjection = { attachment: AttachmentWithComputed };
 
 type RetrieveAttachmentFromIdParamRequest = CrowiProperties &
   Request<{ id: string }, any, any, any, LocalsAfterDataInjection>;
@@ -49,7 +50,7 @@ export const retrieveAttachmentFromIdParam = async (
   next: NextFunction,
 ): Promise<void> => {
   const id = req.params.id;
-  const attachment = await Attachment.findById(id);
+  const attachment = await prisma.attachments.findUnique({ where: { id } });
 
   if (attachment == null) {
     res.json(ApiResponse.error('attachment not found'));
@@ -59,10 +60,10 @@ export const retrieveAttachmentFromIdParam = async (
   const user = req.user;
 
   // check viewer has permission
-  if (user != null && attachment.page != null) {
+  if (user != null && attachment.pageId != null) {
     const Page = mongoose.model<IPage, PageModel>('Page');
     const isAccessible = await Page.isAccessiblePageByViewer(
-      getIdStringForRef(attachment.page),
+      attachment.pageId,
       user,
     );
     if (!isAccessible) {
@@ -81,7 +82,7 @@ export const retrieveAttachmentFromIdParam = async (
 };
 
 export const generateHeadersForFresh = (
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
 ): ExpressHttpHeader[] => {
   return toExpressHttpHeaders({
     ETag: `Attachment-${attachment._id}`,
@@ -92,7 +93,7 @@ export const generateHeadersForFresh = (
 const respondForRedirectMode = async (
   res: Response,
   fileUploadService: FileUploader,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   opts?: RespondOptions,
 ): Promise<void> => {
   const isDownload = opts?.download ?? false;
@@ -115,7 +116,8 @@ const respondForRedirectMode = async (
   // persist temporaryUrl
   if (!isDownload) {
     try {
-      attachment.cashTemporaryUrlByProvideSec(
+      prisma.attachments.cashTemporaryUrlByProvideSec(
+        attachment.id,
         temporaryUrl.url,
         temporaryUrl.lifetimeSec,
       );
@@ -129,7 +131,7 @@ const respondForRedirectMode = async (
 const respondForRelayMode = async (
   res: Response,
   fileUploadService: FileUploader,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   opts?: RespondOptions,
 ): Promise<void> => {
   // apply content-* headers before response
@@ -151,7 +153,7 @@ const respondForRelayMode = async (
 
 export const getActionFactory = (
   crowi: Crowi,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
 ) => {
   return async (
     req: CrowiRequest,

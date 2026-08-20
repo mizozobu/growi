@@ -1,8 +1,13 @@
 import mongoose from 'mongoose';
 
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { Attachment } from '~/server/models/attachment';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+// imported for its side effect of registering the Attachment schema
+import '~/server/models/attachment';
+import {
+  getModelSafely,
+  getMongoUri,
+  mongoOptions,
+} from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
@@ -30,6 +35,7 @@ export async function up(db) {
       update: { $set: { attachmentType: AttachmentType.PROFILE_IMAGE } },
     },
   };
+  const Attachment = getModelSafely('Attachment');
   await Attachment.bulkWrite([
     operationsForWikiPage,
     operationsForProfileImage,
