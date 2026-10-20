@@ -4,10 +4,7 @@ import type { Readable } from 'stream';
 import type { ICheckLimitResult } from '~/interfaces/attachment';
 import type Crowi from '~/server/crowi';
 import type { RespondOptions } from '~/server/interfaces/attachment';
-import type {
-  AttachmentDraft,
-  AttachmentWithComputed,
-} from '~/server/models/attachment';
+import type { IAttachmentDocument } from '~/server/models/attachment';
 
 import {
   AbstractFileUploader,
@@ -65,14 +62,14 @@ class NoneFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override deleteFile(_attachment: AttachmentWithComputed): void {
+  override deleteFile(_attachment: IAttachmentDocument): void {
     throw new Error('File upload is disabled');
   }
 
   /**
    * @inheritdoc
    */
-  override deleteFiles(_attachmentsToDelete: AttachmentWithComputed[]): void {
+  override deleteFiles(_attachments: IAttachmentDocument[]): void {
     throw new Error('File upload is disabled');
   }
 
@@ -91,7 +88,7 @@ class NoneFileUploader extends AbstractFileUploader {
    */
   override async uploadAttachment(
     _readable: Readable,
-    _attachment: AttachmentDraft,
+    _attachment: IAttachmentDocument,
   ): Promise<void> {
     throw new Error('File upload is disabled');
   }
@@ -101,7 +98,7 @@ class NoneFileUploader extends AbstractFileUploader {
    */
   override respond(
     res: Response,
-    _attachment: AttachmentWithComputed,
+    _attachment: IAttachmentDocument,
     _opts?: RespondOptions,
   ): void {
     res.status(404).send('File upload is disabled');
@@ -111,7 +108,7 @@ class NoneFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override findDeliveryFile(
-    _attachment: AttachmentWithComputed,
+    _attachment: IAttachmentDocument,
   ): Promise<NodeJS.ReadableStream> {
     throw new Error('File upload is disabled');
   }
@@ -120,7 +117,7 @@ class NoneFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override generateTemporaryUrl(
-    _attachment: AttachmentWithComputed,
+    _attachment: IAttachmentDocument,
     _opts?: RespondOptions,
   ): Promise<TemporaryUrl> {
     throw new Error('File upload is disabled');

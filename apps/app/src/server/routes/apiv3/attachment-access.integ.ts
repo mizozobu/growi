@@ -20,7 +20,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { prisma } from '~/utils/prisma';
+import { Attachment } from '~/server/models/attachment';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
@@ -95,39 +95,33 @@ describe("GET /attachment/:id — must check access to the attachment's owning p
     accessiblePageId = String(accessiblePage._id);
     privatePageId = String(privatePage._id);
 
-    const accessibleAttachment = await prisma.attachments.create({
-      data: {
-        pageId: accessiblePageId,
-        creatorId: testUser._id.toString(),
-        fileName: `attachment-access-integ-accessible-${WORKER_ID}`,
-        fileFormat: 'text/plain',
-        originalName: 'accessible.txt',
-        attachmentType: AttachmentType.WIKI_PAGE,
-      },
+    const accessibleAttachment = await Attachment.create({
+      page: accessiblePageId,
+      creator: testUser._id,
+      fileName: `attachment-access-integ-accessible-${WORKER_ID}`,
+      fileFormat: 'text/plain',
+      originalName: 'accessible.txt',
+      attachmentType: AttachmentType.WIKI_PAGE,
     });
-    const privateAttachment = await prisma.attachments.create({
-      data: {
-        pageId: privatePageId,
-        creatorId: otherUser._id.toString(),
-        fileName: `attachment-access-integ-private-${WORKER_ID}`,
-        fileFormat: 'text/plain',
-        originalName: 'SECRET-ORIGINAL-NAME.txt',
-        attachmentType: AttachmentType.WIKI_PAGE,
-      },
+    const privateAttachment = await Attachment.create({
+      page: privatePageId,
+      creator: otherUser._id,
+      fileName: `attachment-access-integ-private-${WORKER_ID}`,
+      fileFormat: 'text/plain',
+      originalName: 'SECRET-ORIGINAL-NAME.txt',
+      attachmentType: AttachmentType.WIKI_PAGE,
     });
-    accessibleAttachmentId = accessibleAttachment.id;
-    privateAttachmentId = privateAttachment.id;
+    accessibleAttachmentId = String(accessibleAttachment._id);
+    privateAttachmentId = String(privateAttachment._id);
 
-    const profileImageAttachment = await prisma.attachments.create({
-      data: {
-        creatorId: otherUser._id.toString(),
-        fileName: `attachment-access-integ-profile-image-${WORKER_ID}`,
-        fileFormat: 'image/png',
-        originalName: 'avatar.png',
-        attachmentType: AttachmentType.PROFILE_IMAGE,
-      },
+    const profileImageAttachment = await Attachment.create({
+      creator: otherUser._id,
+      fileName: `attachment-access-integ-profile-image-${WORKER_ID}`,
+      fileFormat: 'image/png',
+      originalName: 'avatar.png',
+      attachmentType: AttachmentType.PROFILE_IMAGE,
     });
-    profileImageAttachmentId = profileImageAttachment.id;
+    profileImageAttachmentId = String(profileImageAttachment._id);
 
     const { setup } = await import('./attachment');
     const router = setup(crowi);
@@ -148,15 +142,13 @@ describe("GET /attachment/:id — must check access to the attachment's owning p
   }, 60_000);
 
   afterAll(async () => {
-    await prisma.attachments.deleteMany({
-      where: {
-        id: {
-          in: [
-            accessibleAttachmentId,
-            privateAttachmentId,
-            profileImageAttachmentId,
-          ],
-        },
+    await Attachment.deleteMany({
+      _id: {
+        $in: [
+          accessibleAttachmentId,
+          privateAttachmentId,
+          profileImageAttachmentId,
+        ],
       },
     });
     await crowi.models.Page.deleteMany({

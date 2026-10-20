@@ -5,10 +5,7 @@ import util from 'util';
 
 import type Crowi from '~/server/crowi';
 import type { RespondOptions } from '~/server/interfaces/attachment';
-import type {
-  AttachmentDraft,
-  AttachmentWithComputed,
-} from '~/server/models/attachment';
+import type { IAttachmentDocument } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
@@ -123,7 +120,7 @@ class GridfsFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async deleteFile(attachment: AttachmentWithComputed): Promise<void> {
+  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
     const { attachmentFileModel } = initializeGridFSModels();
     const filenameValue = attachment.fileName;
 
@@ -147,7 +144,7 @@ class GridfsFileUploader extends AbstractFileUploader {
    * Bulk delete files since unlink method of mongoose-gridfs does not support bulk operation
    */
   override async deleteFiles(
-    attachments: AttachmentWithComputed[],
+    attachments: IAttachmentDocument[],
   ): Promise<void> {
     const { attachmentFileModel, chunkCollection } = initializeGridFSModels();
 
@@ -186,7 +183,7 @@ class GridfsFileUploader extends AbstractFileUploader {
    */
   override async uploadAttachment(
     readable: Readable,
-    attachment: AttachmentDraft,
+    attachment: IAttachmentDocument,
   ): Promise<void> {
     logger.debug(`File uploading: fileName=${attachment.fileName}`);
 
@@ -216,7 +213,7 @@ class GridfsFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override findDeliveryFile(
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
   ): Promise<NodeJS.ReadableStream> {
     throw new Error('Method not implemented.');
   }
@@ -225,7 +222,7 @@ class GridfsFileUploader extends AbstractFileUploader {
    * @inheritDoc
    */
   override async generateTemporaryUrl(
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl> {
     throw new Error(

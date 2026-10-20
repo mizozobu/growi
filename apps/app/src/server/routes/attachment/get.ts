@@ -15,20 +15,19 @@ import {
   toExpressHttpHeaders,
 } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import {
   certifySharedPageAttachmentMiddleware,
   type RequestToAllowShareLink,
 } from '../../middlewares/certify-shared-page-attachment';
-import type { AttachmentWithComputed } from '../../models/attachment';
+import type { IAttachmentDocument } from '../../models/attachment';
 import { resolveAccessibleAttachment } from '../../service/attachment/resolve-accessible-attachment';
 import ApiResponse from '../../util/apiResponse';
 
 const logger = loggerFactory('growi:routes:attachment:get');
 
-type LocalsAfterDataInjection = { attachment: AttachmentWithComputed };
+type LocalsAfterDataInjection = { attachment: IAttachmentDocument };
 
 type RetrieveAttachmentFromIdParamRequest = CrowiProperties &
   RequestToAllowShareLink &
@@ -71,7 +70,7 @@ export const retrieveAttachmentFromIdParam = async (
 };
 
 export const generateHeadersForFresh = (
-  attachment: AttachmentWithComputed,
+  attachment: IAttachmentDocument,
 ): ExpressHttpHeader[] => {
   return toExpressHttpHeaders({
     ETag: `Attachment-${attachment._id}`,
@@ -82,7 +81,7 @@ export const generateHeadersForFresh = (
 const respondForRedirectMode = async (
   res: Response,
   fileUploadService: FileUploader,
-  attachment: AttachmentWithComputed,
+  attachment: IAttachmentDocument,
   opts?: RespondOptions,
 ): Promise<void> => {
   const isDownload = opts?.download ?? false;
@@ -105,8 +104,7 @@ const respondForRedirectMode = async (
   // persist temporaryUrl
   if (!isDownload) {
     try {
-      await prisma.attachments.cashTemporaryUrlByProvideSec(
-        attachment.id,
+      attachment.cashTemporaryUrlByProvideSec(
         temporaryUrl.url,
         temporaryUrl.lifetimeSec,
       );
@@ -120,7 +118,7 @@ const respondForRedirectMode = async (
 const respondForRelayMode = async (
   res: Response,
   fileUploadService: FileUploader,
-  attachment: AttachmentWithComputed,
+  attachment: IAttachmentDocument,
   opts?: RespondOptions,
 ): Promise<void> => {
   // apply content-* headers before response
@@ -142,7 +140,7 @@ const respondForRelayMode = async (
 
 export const getActionFactory = (
   crowi: Crowi,
-  attachment: AttachmentWithComputed,
+  attachment: IAttachmentDocument,
 ) => {
   return async (
     req: CrowiRequest,

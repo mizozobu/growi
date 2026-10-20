@@ -4,16 +4,18 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import { prisma } from '~/utils/prisma';
-
 import type { RequestToAllowShareLink } from '../../middlewares/certify-shared-page-attachment';
-import type { AttachmentWithComputed } from '../../models/attachment';
+import { Attachment, type IAttachmentDocument } from '../../models/attachment';
 import { retrieveAttachmentFromIdParam } from './get';
 
 type TestRequest = Request &
   RequestToAllowShareLink & {
     user?: HydratedDocument<IUser>;
   };
+
+vi.mock('../../models/attachment', () => ({
+  Attachment: { findById: vi.fn() },
+}));
 
 describe('retrieveAttachmentFromIdParam', () => {
   const pageId = '000000000000000000000001';
@@ -22,14 +24,11 @@ describe('retrieveAttachmentFromIdParam', () => {
     vi.restoreAllMocks();
   });
 
-  const mockFindUniqueAttachment = (hasPage: boolean) => {
-    const attachment = mock<AttachmentWithComputed>({
-      id: '0000000000000000000000a1',
-      pageId: hasPage ? pageId : null,
+  const buildAttachment = (hasPage: boolean): IAttachmentDocument =>
+    mock<IAttachmentDocument>({
+      id: 'attachment1',
+      page: hasPage ? pageId : undefined,
     });
-    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
-    return attachment;
-  };
 
   const mockIsAccessiblePageByViewer = (isAccessible: boolean) => {
     const isAccessiblePageByViewer = vi.fn().mockResolvedValue(isAccessible);
@@ -44,7 +43,7 @@ describe('retrieveAttachmentFromIdParam', () => {
     isSharedPage?: boolean;
   }) => {
     const req = mock<TestRequest>({
-      params: { id: '0000000000000000000000a1' },
+      params: { id: 'attachment1' },
       user: overrides.user,
       isSharedPage: overrides.isSharedPage,
     });
@@ -56,7 +55,7 @@ describe('retrieveAttachmentFromIdParam', () => {
 
   it('denies a guest (no user, no share link) from downloading a private page attachment', async () => {
     // Arrange: guest request, not via a certified share link, page denies anonymous viewers
-    mockFindUniqueAttachment(true);
+    vi.mocked(Attachment.findById).mockResolvedValue(buildAttachment(true));
     const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
     const { req, res, next } = buildReqResNext({
       user: undefined,
@@ -75,7 +74,7 @@ describe('retrieveAttachmentFromIdParam', () => {
   it('allows a guest through a certified share link without re-running the page-viewer check', async () => {
     // Arrange: certifySharedPageAttachmentMiddleware already bound this fileId
     // to the share link's page, so no separate viewer check should run.
-    mockFindUniqueAttachment(true);
+    vi.mocked(Attachment.findById).mockResolvedValue(buildAttachment(true));
     const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
     const { req, res, next } = buildReqResNext({
       user: undefined,
@@ -91,7 +90,7 @@ describe('retrieveAttachmentFromIdParam', () => {
   });
 
   it('denies a logged-in user who is not a viewer of the owning page', async () => {
-    mockFindUniqueAttachment(true);
+    vi.mocked(Attachment.findById).mockResolvedValue(buildAttachment(true));
     const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
     const { req, res, next } = buildReqResNext({
       user: mock<HydratedDocument<IUser>>(),
@@ -106,7 +105,7 @@ describe('retrieveAttachmentFromIdParam', () => {
   });
 
   it('allows a viewer who has access to the owning page', async () => {
-    mockFindUniqueAttachment(true);
+    vi.mocked(Attachment.findById).mockResolvedValue(buildAttachment(true));
     mockIsAccessiblePageByViewer(true);
     const { req, res, next } = buildReqResNext({
       user: mock<HydratedDocument<IUser>>(),
@@ -120,7 +119,7 @@ describe('retrieveAttachmentFromIdParam', () => {
   });
 
   it('skips the viewer check for an attachment with no owning page', async () => {
-    mockFindUniqueAttachment(false);
+    vi.mocked(Attachment.findById).mockResolvedValue(buildAttachment(false));
     const modelSpy = vi.spyOn(mongoose, 'model');
     const { req, res, next } = buildReqResNext({
       user: undefined,

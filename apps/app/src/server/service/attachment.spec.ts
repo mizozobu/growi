@@ -1,8 +1,8 @@
 import { mock } from 'vitest-mock-extended';
 
-import { prisma } from '~/utils/prisma';
-
 import type Crowi from '../crowi';
+import type { IAttachmentDocument } from '../models/attachment';
+import { Attachment } from '../models/attachment';
 import { AttachmentService } from './attachment';
 
 // Locks down two contracts of removeAttachment:
@@ -13,9 +13,9 @@ import { AttachmentService } from './attachment';
 //    an orphan blob.
 describe('AttachmentService.removeAttachment', () => {
   test('should resolve without throwing when the attachment is already gone', async () => {
-    const findUniqueSpy = vi
-      .spyOn(prisma.attachments, 'findUnique')
-      .mockResolvedValueOnce(null);
+    const findByIdSpy = vi
+      .spyOn(Attachment, 'findById')
+      .mockResolvedValue(null);
     const deleteFile = vi.fn();
     const crowi = mock<Crowi>({
       fileUploadService: { deleteFile },
@@ -27,18 +27,16 @@ describe('AttachmentService.removeAttachment', () => {
     ).resolves.toBeUndefined();
 
     expect(deleteFile).not.toHaveBeenCalled();
-    findUniqueSpy.mockRestore();
+    findByIdSpy.mockRestore();
   });
 
   test('should propagate the error and not drop the metadata doc when the file store fails', async () => {
-    const deleteSpy = vi.spyOn(prisma.attachments, 'delete');
-    const fakeAttachment = mock<
-      Awaited<ReturnType<typeof prisma.attachments.findUnique>>
-    >({
-      id: 'some-id',
+    const attachmentRemove = vi.fn().mockResolvedValue(undefined);
+    const fakeAttachment = mock<IAttachmentDocument>({
+      remove: attachmentRemove,
     });
-    const findUniqueSpy = vi
-      .spyOn(prisma.attachments, 'findUnique')
+    const findByIdSpy = vi
+      .spyOn(Attachment, 'findById')
       .mockResolvedValue(fakeAttachment);
     const deleteFile = vi
       .fn()
@@ -55,7 +53,7 @@ describe('AttachmentService.removeAttachment', () => {
 
     expect(deleteFile).toHaveBeenCalledTimes(1);
     // metadata doc must survive so the blob stays referenceable for retry
-    expect(deleteSpy).not.toHaveBeenCalled();
-    findUniqueSpy.mockRestore();
+    expect(attachmentRemove).not.toHaveBeenCalled();
+    findByIdSpy.mockRestore();
   });
 });

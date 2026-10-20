@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import type { HydratedDocument } from 'mongoose';
 import type { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,12 +9,11 @@ import {
   type RespondOptions,
   ResponseMode,
 } from '~/server/interfaces/attachment';
-import type {
-  AttachmentDraft,
-  AttachmentWithComputed,
+import {
+  Attachment,
+  type IAttachmentDocument,
 } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
 
 import { configManager } from '../config-manager';
 import type { MultipartUploader } from './multipart-uploader';
@@ -39,26 +39,26 @@ export interface FileUploader {
   getFileUploadEnabled(): boolean;
   listFiles(): any;
   saveFile(param: SaveFileParam): Promise<any>;
-  deleteFile(attachment: AttachmentWithComputed): void;
-  deleteFiles(attachments: AttachmentWithComputed[]): void;
+  deleteFile(attachment: HydratedDocument<IAttachmentDocument>): void;
+  deleteFiles(attachments: HydratedDocument<IAttachmentDocument>[]): void;
   getFileUploadTotalLimit(): number;
   getTotalFileSize(): Promise<number>;
   checkLimit(uploadFileSize: number): Promise<ICheckLimitResult>;
   determineResponseMode(): ResponseMode;
   uploadAttachment(
     readable: Readable,
-    attachment: AttachmentDraft,
+    attachment: IAttachmentDocument,
   ): Promise<void>;
   respond(
     res: Response,
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
     opts?: RespondOptions,
   ): void;
   findDeliveryFile(
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
   ): Promise<NodeJS.ReadableStream>;
   generateTemporaryUrl(
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl>;
   createMultipartUploader: (
@@ -124,9 +124,11 @@ export abstract class AbstractFileUploader implements FileUploader {
 
   abstract saveFile(param: SaveFileParam);
 
-  abstract deleteFile(attachment: AttachmentWithComputed): void;
+  abstract deleteFile(attachment: HydratedDocument<IAttachmentDocument>): void;
 
-  abstract deleteFiles(attachments: AttachmentWithComputed[]): void;
+  abstract deleteFiles(
+    attachments: HydratedDocument<IAttachmentDocument>[],
+  ): void;
 
   /**
    * Returns file upload total limit in bytes.
@@ -142,11 +144,13 @@ export abstract class AbstractFileUploader implements FileUploader {
    */
   async getTotalFileSize() {
     // Get attachment total file size
-    const res = await prisma.attachments.aggregate({
-      _sum: { fileSize: true },
+    const res = await Attachment.aggregate().group({
+      _id: null,
+      total: { $sum: '$fileSize' },
     });
 
-    return res._sum.fileSize ?? 0;
+    // res is [] if not using
+    return res.length === 0 ? 0 : res[0].total;
   }
 
   /**
@@ -204,7 +208,7 @@ export abstract class AbstractFileUploader implements FileUploader {
 
   abstract uploadAttachment(
     readable: Readable,
-    attachment: AttachmentDraft,
+    attachment: IAttachmentDocument,
   ): Promise<void>;
 
   /**
@@ -222,7 +226,7 @@ export abstract class AbstractFileUploader implements FileUploader {
    */
   abstract respond(
     res: Response,
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
     opts?: RespondOptions,
   ): void;
 
@@ -230,14 +234,14 @@ export abstract class AbstractFileUploader implements FileUploader {
    * Find the file and Return ReadStream
    */
   abstract findDeliveryFile(
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
   ): Promise<NodeJS.ReadableStream>;
 
   /**
    * Generate temporaryUrl that is valid for a very short time
    */
   abstract generateTemporaryUrl(
-    attachment: AttachmentWithComputed,
+    attachment: IAttachmentDocument,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl>;
 }

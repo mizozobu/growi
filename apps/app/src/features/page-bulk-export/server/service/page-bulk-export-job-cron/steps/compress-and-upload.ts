@@ -5,10 +5,10 @@ import archiver from 'archiver';
 import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import type { AttachmentDraft } from '~/server/models/attachment';
+import type { IAttachmentDocument } from '~/server/models/attachment';
+import { Attachment } from '~/server/models/attachment';
 import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
 
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { IPageBulkExportJobCronService } from '..';
@@ -34,15 +34,14 @@ function setUpPageArchiver(): Archiver {
 async function postProcess(
   this: IPageBulkExportJobCronService,
   pageBulkExportJob: PageBulkExportJobDocument,
-  draft: AttachmentDraft,
+  attachment: IAttachmentDocument,
   fileSize: number,
 ): Promise<void> {
-  const attachment = await prisma.attachments.create({
-    data: { ...draft, fileSize },
-  });
+  attachment.fileSize = fileSize;
+  await attachment.save();
 
   pageBulkExportJob.completedAt = new Date();
-  pageBulkExportJob.attachment = attachment.id;
+  pageBulkExportJob.attachment = attachment._id;
   pageBulkExportJob.status = PageBulkExportJobStatus.completed;
   await pageBulkExportJob.save();
 
@@ -71,7 +70,7 @@ export async function compressAndUpload(
   if (pageBulkExportJob.revisionListHash == null)
     throw new Error('revisionListHash is not set');
   const originalName = `${pageBulkExportJob.revisionListHash}.${this.compressExtension}`;
-  const draft = prisma.attachments.createWithoutSave(
+  const attachment = Attachment.createWithoutSave(
     null,
     user,
     originalName,
@@ -97,10 +96,10 @@ export async function compressAndUpload(
   this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver, uploadStream);
 
   try {
-    await fileUploadService.uploadAttachment(uploadStream, draft);
+    await fileUploadService.uploadAttachment(uploadStream, attachment);
     await postProcess.bind(this)(
       pageBulkExportJob,
-      draft,
+      attachment,
       pageArchiver.pointer(),
     );
   } catch (e) {

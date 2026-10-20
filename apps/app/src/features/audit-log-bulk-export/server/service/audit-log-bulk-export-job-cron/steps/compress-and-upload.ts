@@ -1,15 +1,16 @@
 import type { IUser } from '@growi/core';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
-import type { HydratedDocument } from 'mongoose';
 
 import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import type { AttachmentDraft } from '~/server/models/attachment';
+import {
+  Attachment,
+  type IAttachmentDocument,
+} from '~/server/models/attachment';
 import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
 
 import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 import type { IAuditLogBulkExportJobCronService } from '..';
@@ -40,15 +41,14 @@ function setUpAuditLogArchiver(
 async function postProcess(
   this: IAuditLogBulkExportJobCronService,
   auditLogBulkExportJob: AuditLogBulkExportJobDocument,
-  draft: AttachmentDraft,
+  attachment: IAttachmentDocument,
   fileSize: number,
 ): Promise<void> {
-  const attachment = await prisma.attachments.create({
-    data: { ...draft, fileSize },
-  });
+  attachment.fileSize = fileSize;
+  await attachment.save();
 
   auditLogBulkExportJob.completedAt = new Date();
-  auditLogBulkExportJob.attachment = attachment.id;
+  auditLogBulkExportJob.attachment = attachment._id;
   auditLogBulkExportJob.status = AuditLogBulkExportJobStatus.completed;
   await auditLogBulkExportJob.save();
 
@@ -65,7 +65,7 @@ async function postProcess(
  */
 export async function compressAndUpload(
   this: IAuditLogBulkExportJobCronService,
-  user: HydratedDocument<IUser>,
+  user: IUser,
   job: AuditLogBulkExportJobDocument,
 ): Promise<void> {
   const auditLogArchiver = setUpAuditLogArchiver.bind(this)();
@@ -73,7 +73,7 @@ export async function compressAndUpload(
   if (job.filterHash == null) throw new Error('filterHash is not set');
 
   const originalName = `audit-logs-${job.filterHash}.zip`;
-  const draft = prisma.attachments.createWithoutSave(
+  const attachment = Attachment.createWithoutSave(
     null,
     user,
     originalName,
@@ -88,7 +88,7 @@ export async function compressAndUpload(
 
   this.setStreamInExecution(job._id, auditLogArchiver);
   try {
-    await fileUploadService.uploadAttachment(auditLogArchiver, draft);
+    await fileUploadService.uploadAttachment(auditLogArchiver, attachment);
   } catch (e) {
     logger.error(e);
     try {
@@ -100,5 +100,5 @@ export async function compressAndUpload(
     await job.save();
     return;
   }
-  await postProcess.bind(this)(job, draft, auditLogArchiver.pointer());
+  await postProcess.bind(this)(job, attachment, auditLogArchiver.pointer());
 }

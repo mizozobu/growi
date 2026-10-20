@@ -6,6 +6,7 @@ import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageModel } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
+import { Attachment } from '../../models/attachment';
 import {
   type ActivityActor,
   recordCascadeAttachmentRemovals,
@@ -43,12 +44,7 @@ export const deleteCompletelyOperation = async (
   const Page = mongoose.model<IPage, PageModel>('Page');
 
   const { attachmentService } = crowi;
-
-  const pageIdStrings = pageIds.map((pageId) => pageId.toString());
-
-  const attachments = await prisma.attachments.findMany({
-    where: { pageId: { in: pageIdStrings } },
-  });
+  const attachments = await Attachment.find({ page: { $in: pageIds } });
 
   if (actor != null) {
     await recordCascadeAttachmentRemovals(
@@ -58,6 +54,12 @@ export const deleteCompletelyOperation = async (
       actor,
     );
   }
+
+  // prisma's `comments.pageId` (String @db.ObjectId) filter expects hex strings,
+  // whereas the mongoose `$in` queries below accept ObjectIdLike as-is. Normalize
+  // to strings for the prisma side only (same ObjectId-stringify convention as
+  // cascade-attachment-removal-inputs); no-op for ids already in string form.
+  const pageIdStrings = pageIds.map((pageId) => pageId.toString());
 
   // Delete reply comments first, then top-level comments, to avoid foreign key constraint violations.
   await prisma.$transaction([
