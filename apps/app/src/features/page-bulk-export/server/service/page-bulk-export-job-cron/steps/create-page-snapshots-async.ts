@@ -10,7 +10,6 @@ import { SupportedAction } from '~/interfaces/activity';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
-import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 
@@ -56,8 +55,8 @@ export async function createPageSnapshotsAsync(
   const Page = mongoose.model<IPage, PageModel>('Page');
 
   // if the process of creating snapshots was interrupted, delete the snapshots and create from the start
-  await PageBulkExportPageSnapshot.deleteMany({
-    pageBulkExportJob: pageBulkExportJob.id,
+  await prisma.pagebulkexportpagesnapshots.deleteMany({
+    where: { pageBulkExportJobId: pageBulkExportJob.id },
   });
 
   const basePage = await Page.findById(pageBulkExportJob.pageId);
@@ -84,10 +83,13 @@ export async function createPageSnapshotsAsync(
         if (page.revision != null) {
           revisionListHash.update(getIdStringForRef(page.revision));
         }
-        await PageBulkExportPageSnapshot.create({
-          pageBulkExportJob: pageBulkExportJob.id,
-          path: page.path,
-          revision: page.revision,
+        await prisma.pagebulkexportpagesnapshots.create({
+          data: {
+            pageBulkExportJobId: pageBulkExportJob.id,
+            path: page.path,
+            revisionId:
+              page.revision != null ? getIdStringForRef(page.revision) : null,
+          },
         });
       } catch (err) {
         callback(err);
