@@ -7,6 +7,7 @@ import { body } from 'express-validator';
 import nextI18nextConfig from '^/config/next-i18next.config.mjs';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
@@ -137,8 +138,9 @@ export const setup = (crowi) => {
       body('autoFormatMarkdownTable').optional().isBoolean(),
     ],
     inAppNotificationSettings: [
-      body('defaultSubscribeRules.*.name').isString(),
-      body('defaultSubscribeRules.*.isEnabled').optional().isBoolean(),
+      body('subscribeRules').isArray(),
+      body('subscribeRules.*.name').isIn(Object.values(subscribeRuleNames)),
+      body('subscribeRules.*.isEnabled').optional().isBoolean({ strict: true }),
     ],
   };
 
@@ -892,7 +894,8 @@ export const setup = (crowi) => {
         const response =
           await prisma.inappnotificationsettings.upsertSubscribeRules(
             req.user.id,
-            subscribeRules,
+            // omit unknown properties
+            subscribeRules.map(({ name, isEnabled }) => ({ name, isEnabled })),
           );
 
         const parameters = {
