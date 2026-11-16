@@ -11,10 +11,6 @@ import { InAppNotificationService } from './in-app-notification';
 const { STATUS_UNOPENED } = InAppNotificationStatuses;
 
 // Mock dependencies
-vi.mock('~/server/models/in-app-notification-settings', () => ({
-  default: { findOne: vi.fn() },
-}));
-
 vi.mock('~/server/models/subscription', () => ({
   default: {
     getSubscription: vi.fn().mockResolvedValue([]),

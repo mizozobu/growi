@@ -15,7 +15,6 @@ import { prisma } from '~/utils/prisma';
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import EditorSettings from '../../../models/editor-settings';
-import InAppNotificationSettings from '../../../models/in-app-notification-settings';
 import { deleteAccessTokenHandlersFactory } from './delete-access-token';
 import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens';
 import { generateAccessTokenHandlerFactory } from './generate-access-token';
@@ -883,20 +882,18 @@ export const setup = (crowi) => {
     validator.inAppNotificationSettings,
     apiV3FormValidator,
     async (req, res) => {
-      const query = { userId: req.user.id };
       const subscribeRules = req.body.subscribeRules;
 
       if (subscribeRules == null) {
         return res.apiv3Err('no-rules-found');
       }
 
-      const options = { upsert: true, new: true, runValidators: true };
       try {
-        const response = await InAppNotificationSettings.findOneAndUpdate(
-          query,
-          { $set: { subscribeRules } },
-          options,
-        );
+        const response =
+          await prisma.inappnotificationsettings.upsertSubscribeRules(
+            req.user.id,
+            subscribeRules,
+          );
 
         const parameters = {
           action:
@@ -936,9 +933,10 @@ export const setup = (crowi) => {
     accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION]),
     loginRequiredStrictly,
     async (req, res) => {
-      const query = { userId: req.user.id };
       try {
-        const response = await InAppNotificationSettings.findOne(query);
+        const response = await prisma.inappnotificationsettings.findFirst({
+          where: { userId: req.user.id },
+        });
         return res.apiv3(response);
       } catch (err) {
         logger.error(err);

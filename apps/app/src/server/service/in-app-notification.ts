@@ -16,7 +16,6 @@ import type { PaginateResult } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type { ActivityDocument } from '~/server/models/activity';
 import type { HydratedNotification } from '~/server/models/in-app-notification';
-import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -219,9 +218,10 @@ export class InAppNotificationService {
     pageId: Types.ObjectId,
     targetRuleName: string,
   ): Promise<void> => {
-    const query = { userId };
     const inAppNotificationSettings =
-      await InAppNotificationSettings.findOne(query);
+      await prisma.inappnotificationsettings.findFirst({
+        where: { userId: userId.toString() },
+      });
     if (inAppNotificationSettings != null) {
       const subscribeRule = inAppNotificationSettings.subscribeRules.find(
         (subscribeRule) => subscribeRule.name === targetRuleName,

@@ -100,6 +100,11 @@ type PageoperationsPage {
   path Json?
 }
 
+type InappnotificationsettingsSubscribeRules {
+  name      String
+  isEnabled Boolean?
+}
+
 type PagesGrantedGroups {
   /// Field referred in an index, but found no data to define the type.
   item Json?
@@ -416,7 +421,10 @@ model inappnotifications {
 }
 
 model inappnotificationsettings {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id             String                                    @id @default(auto()) @map("_id") @db.ObjectId
+  v              Int                                       @default(0) @map("__v")
+  userId         String?                                   @db.ObjectId
+  subscribeRules InappnotificationsettingsSubscribeRules[]
 }
 
 model mastrarefreshedmodelcatalogs {
@@ -645,15 +653,15 @@ model passwordresetorders {
 }
 
 model revisions {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  v             Int      @default(0) @map("__v")
-  authorId      String?  @map("author") @db.ObjectId
-  body          String
-  createdAt     DateTime @default(now())
-  hasDiffToPrev Boolean?
-  format        String   @default("markdown")
-  origin        String?
-  pageId        String   @db.ObjectId
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                    Int      @default(0) @map("__v")
+  authorId             String?  @map("author") @db.ObjectId
+  body                 String
+  createdAt            DateTime @default(now())
+  hasDiffToPrev        Boolean?
+  format               String   @default("markdown")
+  origin               String?
+  pageId               String   @db.ObjectId
   proposalId           String?  @db.ObjectId
   proposalOperationKey String?
 

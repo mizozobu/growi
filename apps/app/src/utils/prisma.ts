@@ -15,6 +15,7 @@ import { extension as BookmarkExtension } from '~/server/models/bookmark';
 import { extension as BookmarkFolderExtension } from '~/server/models/bookmark-folder';
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
 import { extension as InAppNotificationExtension } from '~/server/models/in-app-notification';
+import { extension as InAppNotificationSettingsExtension } from '~/server/models/in-app-notification-settings';
 import { extension as PageRedirectExtension } from '~/server/models/page-redirect';
 import { extension as PageTagRelationExtension } from '~/server/models/page-tag-relation';
 import { extension as RevisionExtension } from '~/server/models/revision';
@@ -219,6 +220,7 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
     .$extends(InAppNotificationExtension)
+    .$extends(InAppNotificationSettingsExtension)
     .$extends(MastraRefreshedModelCatalogExtension)
     .$extends(PageBulkExportJobExtension)
     .$extends(PageBulkExportPageSnapshotExtension)
